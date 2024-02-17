@@ -8,13 +8,18 @@ import (
 	"io"
 	"log"
 	"net/http"
+
+	"github.com/beevik/etree"
 )
+
+type M map[string]interface{}
 
 func index(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Apa Kabar?")
 }
 
 func main() {
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Halo")
 	})
@@ -29,6 +34,7 @@ func main() {
 	http.HandleFunc("/student/postJSON", postStudentJSON)
 
 	http.HandleFunc("/xml", xmlGet)
+	http.HandleFunc("/structxml", structXML)
 	http.HandleFunc("/sampleXML", getDataXML)
 
 	fmt.Println("starting web server at http://localhost:8080/")
@@ -69,7 +75,52 @@ func xmlGet(w http.ResponseWriter, r *http.Request) {
 	w.Write(x)
 }
 
+func structXML(w http.ResponseWriter, r *http.Request) {
+	doc := etree.NewDocument()
+	if err := doc.ReadFromFile("simple.xml"); err != nil {
+		log.Fatal(err.Error())
+	}
+
+	root := doc.SelectElement("breakfast_menu")
+	rows := make([]M, 0)
+
+	for _, valFood := range root.FindElements("food") {
+		row := make(M)
+		row["name"] = valFood.SelectElement("name").Text()
+		row["price"] = valFood.SelectElement("price").Text()
+		row["description"] = valFood.SelectElement("description").Text()
+		row["calories"] = valFood.SelectElement("calories").Text()
+
+		rows = append(rows, row)
+	}
+
+	bts, err := json.MarshalIndent(rows, "", "  ")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	foodStruct := []Food{}
+	json.Unmarshal(bts, &foodStruct)
+
+	for val := range foodStruct {
+		dataInner := foodStruct[val]
+		fmt.Println(val)
+		fmt.Println("Calories : " + dataInner.Calories)
+		fmt.Println("Description : " + dataInner.Description)
+		fmt.Println("Name : " + dataInner.Name)
+		fmt.Println("Price : " + dataInner.Price)
+	}
+	fmt.Println(foodStruct)
+
+	xmlData, _ := xml.Marshal(foodStruct)
+	fmt.Println(string(xmlData))
+
+	w.Write(xmlData)
+}
+
 func getDataXML(w http.ResponseWriter, r *http.Request) {
+
 	httpposturl := "http://202.152.20.230:1010/simulator/bpjstk/inq_pu.php"
 	postBody, _ := io.ReadAll(r.Body)
 
